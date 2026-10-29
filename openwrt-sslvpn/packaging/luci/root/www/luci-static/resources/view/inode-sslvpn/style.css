@@ -1,0 +1,42 @@
+/* Scoped additions inherit LuCI theme colors and fonts. */
+.inode-page { --inode-border: var(--border-color-medium, rgba(128,128,128,.28)); }
+.inode-page .inode-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+.inode-page .inode-header h2 { margin:.35rem 0 .5rem; }
+.inode-page .inode-eyebrow { font-size:.8rem; font-weight:600; letter-spacing:.08em; opacity:.65; }
+.inode-page .inode-hint { font-size:.9em; line-height:1.7; opacity:.75; }
+.inode-page .inode-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin:1rem 0 1.5rem; }
+.inode-page .inode-card { padding:1.25rem; border:1px solid var(--inode-border); border-radius:8px; background:var(--background-color-high,transparent); }
+.inode-page .inode-card h3 { margin:0 0 .5rem; font-size:1rem; }
+.inode-page .inode-card p { margin:.75rem 0 0; }
+.inode-page .inode-label { font-size:.9em; opacity:.75; margin-bottom:.6rem; }
+.inode-page .inode-value { display:block; font-size:1.3rem; line-height:1.5; }
+.inode-page .inode-good { color:var(--success-color,#278044); }
+.inode-page .inode-warn { color:var(--warning-color,#a56a05); }
+.inode-page .inode-section { padding:1.25rem; border:1px solid var(--inode-border); border-radius:8px; margin-bottom:1rem; }
+.inode-page .inode-section h3 { margin-top:0; }
+.inode-page .inode-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem; }
+.inode-page .inode-actions .cbi-button { margin:0; }
+.inode-page label { display:inline-flex; gap:.4rem; align-items:center; cursor:pointer; }
+.inode-page .inode-boot { display:flex; align-items:center; gap:1rem; border-top:1px solid var(--inode-border); padding-top:1rem; margin-top:1rem; }
+.inode-page .inode-details { display:grid; grid-template-columns:minmax(100px,140px) 1fr; gap:.75rem 1rem; margin:1rem 0 1.5rem; }
+.inode-page .inode-details dt { opacity:.75; }
+.inode-page .inode-details dd { margin:0; overflow-wrap:anywhere; }
+.inode-page .inode-mono,.inode-page .inode-routes { font-family:monospace; }
+.inode-page .inode-routes { white-space:pre-wrap; overflow-wrap:anywhere; max-height:20rem; overflow:auto; padding:1rem; border:1px solid var(--inode-border); border-radius:6px; color:inherit; background:transparent; }
+.inode-page .inode-error { padding:1rem; border:1px solid var(--error-color,#c44); border-radius:6px; }
+.inode-page .inode-error[hidden] { display:none; }
+.inode-page .inode-intro { margin-bottom:1rem; }
+.inode-page .inode-events { max-height:34rem; overflow:auto; }
+.inode-page .inode-event { display:grid; grid-template-columns:2rem 5.5rem 1fr; gap:.75rem; align-items:start; padding:1rem 0; border-bottom:1px solid var(--inode-border); line-height:1.6; overflow-wrap:anywhere; }
+.inode-page .inode-event:last-child { border-bottom:0; }
+.inode-page .inode-event-number { font-family:monospace; opacity:.5; }
+.inode-page .inode-badge { font-size:.8rem; font-weight:600; }
+.inode-page .inode-empty { text-align:center; padding:2rem 1rem; opacity:.65; }
+@media (max-width:600px) {
+ .inode-page .inode-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .inode-page .inode-diagnostics { grid-template-columns:1fr; }
+ .inode-page .inode-value { font-size:1.1rem; }
+ .inode-page .inode-event { grid-template-columns:1.5rem 1fr; gap:.5rem; }
+ .inode-page .inode-event > :last-child { grid-column:2; }
+ .inode-page .inode-section,.inode-page .inode-card { padding:1rem; }
+}

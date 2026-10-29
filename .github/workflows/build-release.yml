@@ -1,0 +1,69 @@
+name: Build iStoreOS release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CC_x86_64_unknown_linux_musl: musl-gcc
+      AR_x86_64_unknown_linux_musl: ar
+      RANLIB_x86_64_unknown_linux_musl: ranlib
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools build-essential perl pkg-config makeself
+          rustup toolchain install 1.92.0 --profile minimal --target x86_64-unknown-linux-musl
+      - name: Build static client without personal paths
+        working-directory: openwrt-sslvpn/client
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=/src --remap-path-prefix=$HOME=/build"
+          cargo +1.92.0 build --locked --release --target x86_64-unknown-linux-musl --features openwrt
+          file target/x86_64-unknown-linux-musl/release/inode
+      - name: Test decoder limits
+        working-directory: openwrt-sslvpn/client
+        run: cargo +1.92.0 test --locked --lib
+      - name: Prepare APK tool
+        run: |
+          mkdir -p build-tools
+          curl --fail --location --retry 3 --output build-tools/apk-tools-static.apk \
+            https://dl-cdn.alpinelinux.org/alpine/edge/main/x86_64/apk-tools-static-3.0.8-r0.apk
+          echo '673f1bfb22136fc42ca035321cf731a4ad0452c000928666cb39a138f0c277bf  build-tools/apk-tools-static.apk' | sha256sum --check
+          tar -xzf build-tools/apk-tools-static.apk -C build-tools sbin/apk.static
+      - name: Package and verify
+        working-directory: openwrt-sslvpn
+        run: |
+          mkdir -p dist/release
+          cp client/target/x86_64-unknown-linux-musl/release/inode dist/release/inode-sslvpn-linux-x86_64-musl
+          python3 packaging/prepare.py --binary dist/release/inode-sslvpn-linux-x86_64-musl --output "$RUNNER_TEMP/inode-stage"
+          cd "$RUNNER_TEMP/inode-stage"
+          sudo env APK="$GITHUB_WORKSPACE/build-tools/sbin/apk.static" sh build-apk.sh
+          for package in output/*.apk; do
+            "$GITHUB_WORKSPACE/build-tools/sbin/apk.static" verify --allow-untrusted "$package"
+          done
+          cd "$GITHUB_WORKSPACE/openwrt-sslvpn"
+          cp "$RUNNER_TEMP/inode-stage/output/"*.apk dist/release/
+          sudo sh packaging/build-offline.sh /usr/bin/makeself "$RUNNER_TEMP/inode-stage/output" \
+            dist/release/inode-sslvpn-0.4.2-r1-istoreos-25.12-x86_64.run
+          sh dist/release/inode-sslvpn-0.4.2-r1-istoreos-25.12-x86_64.run --check
+          sh dist/release/inode-sslvpn-0.4.2-r1-istoreos-25.12-x86_64.run --noexec --target "$RUNNER_TEMP/unpacked"
+          cmp packaging/install-offline.sh "$RUNNER_TEMP/unpacked/install.sh"
+          for package in "$RUNNER_TEMP/inode-stage/output/"*.apk; do
+            cmp "$package" "$RUNNER_TEMP/unpacked/$(basename "$package")"
+          done
+          cd dist/release
+          sha256sum inode-sslvpn-linux-x86_64-musl *.apk *.run > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: inode-sslvpn-0.4.2-r1-x86_64
+          path: openwrt-sslvpn/dist/release/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,51 @@
+#!/bin/sh
+set -e
+set -f
+. /lib/functions.sh
+config_load inode-sslvpn
+config_get gateway main gateway
+config_get domain main domain local
+config_get username main username
+config_get password_file main password_file /etc/inode-sslvpn/password
+config_get servercert main servercert
+config_get ca_file main ca_file
+config_get_bool gateway_routes main gateway_routes 1
+config_get_bool gateway_dns main gateway_dns 0
+config_get dns_domains main dns_domain
+config_get reconnect main reconnect_attempts 5
+config_get keepalive main keepalive 30
+config_get mtu main mtu 1400
+config_get routes main route
+[ -n "$gateway" ] && [ -n "$username" ] || { echo 'Set gateway and username' >&2; exit 1; }
+if [ "$gateway_dns" = 1 ] && [ -z "$dns_domains" ]; then
+	echo 'Set at least one internal DNS domain before enabling gateway DNS' >&2; exit 1
+fi
+[ "$password_file" = /etc/inode-sslvpn/password ] || {
+	echo 'Use /etc/inode-sslvpn/password for the password' >&2; exit 1;
+}
+[ -f "$password_file" ] && [ ! -L "$password_file" ] && [ -s "$password_file" ] || {
+	echo 'Fill /etc/inode-sslvpn/password before connecting' >&2; exit 1;
+}
+[ "$(stat -c '%a:%u' "$password_file")" = 600:0 ] || {
+	echo 'Password file must be owned by root with mode 600' >&2; exit 1;
+}
+set -- /usr/sbin/inode-sslvpn connect "$gateway" --domain "$domain" --user "$username" \
+	--password-stdin --reconnect-attempts "$reconnect" --keepalive "$keepalive" --mtu "$mtu"
+if [ -n "$servercert" ]; then
+	set -- "$@" --servercert "$servercert"
+fi
+if [ -n "$ca_file" ]; then
+	set -- "$@" --ca "$ca_file"
+fi
+[ "$gateway_routes" = 0 ] || set -- "$@" --gateway-routes
+for route in $routes; do
+	set -- "$@" --route "$route"
+done
+umask 077
+export INODE_STATUS_FILE=/var/run/inode-sslvpn/status
+if [ "$gateway_dns" = 1 ]; then
+	export INODE_DNS_HELPER=/usr/libexec/inode-sslvpn-dns
+else
+	unset INODE_DNS_HELPER
+fi
+exec "$@" < "$password_file"

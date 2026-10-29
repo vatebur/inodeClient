@@ -1,0 +1,109 @@
+#!/bin/sh
+# Fixed-purpose rpcd API. Never expose file, exec, init or logread RPC permissions.
+. /usr/share/libubox/jshn.sh
+reply_error() { json_init; json_add_string error "$1"; json_dump; }
+case "$1" in
+list)
+ echo '{"status":{},"logs":{},"password":{"password":""},"control":{"action":""},"boot":{"enabled":true}}'
+ ;;
+call)
+ case "$2" in
+ status)
+  running=0; pid=0
+  data=$(ubus call service list '{"name":"inode-sslvpn"}')
+  json_load "$data"
+  if json_select inode-sslvpn && json_select instances; then
+   json_get_keys instances
+   for instance in $instances; do
+    json_select "$instance"
+    json_get_var active running; json_get_var process pid
+    [ "$active" != 1 ] || { running=1; pid=$process; }
+    json_select ..
+   done
+  fi
+  connected=0; iface=''; address=''; routes=''
+  if [ "$running" = 1 ] && [ -f /var/run/inode-sslvpn/status ]; then
+   { read -r owner; read -r candidate; read -r ready; } < /var/run/inode-sslvpn/status
+   case "$candidate" in inode*) ;; *) candidate='' ;; esac
+   case "$candidate" in *[!a-zA-Z0-9_]*) candidate='' ;; esac
+   if [ "$owner" = "$pid" ] && [ -n "$candidate" ] && [ -d "/sys/class/net/$candidate" ]; then
+    iface=$candidate
+    address=$(ip -o -4 addr show dev "$iface" | awk '{print $4}')
+    routes=$(ip -4 route show dev "$iface")
+    [ "$ready" != 1 ] || [ -z "$address" ] || connected=1
+   fi
+  fi
+  boot=0; /etc/init.d/inode-sslvpn enabled && boot=1
+  password=0
+  [ ! -L /etc/inode-sslvpn/password ] && [ -s /etc/inode-sslvpn/password ] && [ "$(stat -c '%a:%u' /etc/inode-sslvpn/password 2>/dev/null)" = 600:0 ] && password=1
+  json_init
+  json_add_boolean running "$running"; json_add_boolean connected "$connected"
+  json_add_boolean boot "$boot"; json_add_boolean password_set "$password"
+  json_add_string interface "$iface"; json_add_string address "$address"; json_add_string routes "$routes"
+  json_dump
+  ;;
+ logs)
+  # Only fixed diagnostic labels leave the router; raw upstream error text can contain secrets.
+  events=$(logread -e inode-sslvpn | tail -n 200 | awk '
+   /LAN firewall:/ {if (/failed|missing|required|progress|pending|unsupported/) print "局域网 VPN 防火墙配置失败：请检查待保存的防火墙修改及系统日志。"; else print "局域网 VPN 防火墙规则已更新。"; next}
+   /[Aa]uthentication failed|[Ll]ogin failed|[Ii]nvalid credentials|[Aa]uthentication rejected|verification code rejected|account or source is locked/ {print "认证失败：请检查账户、密码、认证域或验证码要求。"; next}
+   /[Cc]ertificate|[Tt][Ll][Ss]|[Ss]ervercert/ {print "证书或 TLS 校验异常：请检查 CA、指纹和系统时间。"; next}
+   /Tunnel ready|Reconnected:/ {print "隧道已连接。"; next}
+   /Tunnel lost|Reconnect failed|disconnected|giving up|Tunnel IP|reassigned/ {print "隧道断开或重连失败：请检查网络和网关。"; next}
+   /Disconnecting/ {print "正在断开连接。"; next}
+   /Password file|password|Set gateway|Use .*password/ {print "本地配置或密码文件检查失败。"; next}
+   /[Rr]oute|TUN|interface/ {print "接口或路由配置事件：请检查地址、路由冲突和 TUN 驱动。"; next}
+   /[Ee]rror|[Ff]ailed/ {print "连接失败：请检查配置、网络及网关可达性。"}
+  ' | tail -n 40)
+  json_init; json_add_string events "$events"; json_dump
+  ;;
+ password)
+  read -r request
+  json_load "$request" || { reply_error '请求格式错误'; exit; }
+  json_get_var password password
+  if [ -n "$password" ]; then
+   [ "${#password}" -le 4096 ] || { reply_error '密码过长'; exit; }
+   case "$password" in *'
+'*|*'
+'*) reply_error '密码不能包含换行'; exit ;; esac
+   [ ! -L /etc/inode-sslvpn ] && [ ! -L /etc/inode-sslvpn/password ] || { reply_error '密码路径不能为符号链接'; exit; }
+   umask 077
+   mkdir -p /etc/inode-sslvpn && chmod 700 /etc/inode-sslvpn || { reply_error '无法创建密码目录'; exit; }
+   tmp=$(mktemp /etc/inode-sslvpn/.password.XXXXXX) || { reply_error '无法创建密码文件'; exit; }
+   if printf '%s\n' "$password" > "$tmp" && chown 0:0 "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" /etc/inode-sslvpn/password; then :; else
+    rm -f "$tmp"; reply_error '密码保存失败'; exit
+   fi
+  fi
+  echo '{}'
+  ;;
+ control)
+  read -r request; json_load "$request" || { reply_error '请求格式错误'; exit; }
+  json_get_var action action
+  case "$action" in
+   connect|reconnect)
+    [ "$(uci -q get inode-sslvpn.main.enabled)" = 1 ] || { reply_error '请先保存并启用允许连接'; exit; }
+    [ -n "$(uci -q get inode-sslvpn.main.gateway)" ] && [ -n "$(uci -q get inode-sslvpn.main.username)" ] || { reply_error '请先保存网关和用户名'; exit; }
+    [ -s /etc/inode-sslvpn/password ] && [ ! -L /etc/inode-sslvpn/password ] && [ "$(stat -c '%a:%u' /etc/inode-sslvpn/password 2>/dev/null)" = 600:0 ] || { reply_error '请先设置密码，密码文件必须由 root 所有且权限为 0600'; exit; }
+    if [ "$action" = reconnect ]; then /etc/init.d/inode-sslvpn restart >/dev/null 2>&1; else /etc/init.d/inode-sslvpn start >/dev/null 2>&1; fi
+    ;;
+   disconnect) /etc/init.d/inode-sslvpn stop >/dev/null 2>&1 ;;
+   *) reply_error '不支持的操作'; exit ;;
+  esac
+  [ "$?" = 0 ] || { reply_error '服务操作失败'; exit; }
+  echo '{}'
+  ;;
+ boot)
+  read -r request; json_load "$request" || { reply_error '请求格式错误'; exit; }
+  json_get_var enabled enabled
+  case "$enabled" in
+   1) /etc/init.d/inode-sslvpn enable >/dev/null 2>&1 ;;
+   0) /etc/init.d/inode-sslvpn disable >/dev/null 2>&1 ;;
+   *) reply_error '开机启动参数无效'; exit ;;
+  esac
+  [ "$?" = 0 ] || { reply_error '开机启动设置失败'; exit; }
+  echo '{}'
+  ;;
+ *) reply_error '不支持的方法' ;;
+ esac
+ ;;
+esac

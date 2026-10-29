@@ -1,0 +1,47 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+
+# User-provided installers, SSH credentials, extracted proprietary binaries.
+/OpenWrtSSH
+/iNodeClient*
+/vendor-inspect/
+/openwrt-inode/
+*.tar.gz
+
+# Build products, dependencies, upstream checkouts and captured gateway pages.
+**/target/
+**/toolchain/
+**/dist/
+**/upstream/
+**/analysis/
+/openwrt-sslvpn/build/*
+!/openwrt-sslvpn/build/zig-cc
+!/openwrt-sslvpn/build/zig-ar
+!/openwrt-sslvpn/build/zig-ranlib
+*.log
+
+# Actual connection configuration and gateway-assigned network information.
+**/local/
+**/private/
+.env
+.env.*
+*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+password
+password.*
+/openwrt-sslvpn/README.zh-CN.md
+/openwrt-sslvpn/BUSINESS-VALIDATION.md
+
+# Local verification and operator notes are not part of the published source.
+/SECURITY-REVIEW.md
+/openwrt-sslvpn/CONFIGURATION.md
+/openwrt-sslvpn/client/tests/
+/openwrt-sslvpn/client/examples/
+/openwrt-sslvpn/client/scripts/
+/openwrt-sslvpn/client/.github/
+/openwrt-sslvpn/packaging/tests/

@@ -1,0 +1,19 @@
+{
+  "name": "inode-sslvpn",
+  "title": "iNode SSL VPN",
+  "entry": "/cgi-bin/luci/admin/services/inode-sslvpn",
+  "author": "inodeClient contributors",
+  "website": "https://github.com/VocabVictor/inode-cli",
+  "version": "0.4.2",
+  "release": 1,
+  "arch": [
+    "x86_64"
+  ],
+  "description": "H3C SSL VPN 协议兼容客户端，支持 UCI 配置与 procd 服务。",
+  "tags": [
+    "network"
+  ],
+  "depends": [
+    "luci-app-inode-sslvpn"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "luci-app-inode-sslvpn": {
+    "description": "Configure iNode SSL VPN",
+    "read": {
+      "uci": [
+        "inode-sslvpn"
+      ],
+      "ubus": {
+        "inode-sslvpn": [
+          "status",
+          "logs"
+        ]
+      }
+    },
+    "write": {
+      "uci": [
+        "inode-sslvpn"
+      ],
+      "ubus": {
+        "inode-sslvpn": [
+          "password",
+          "control",
+          "boot"
+        ]
+      }
+    }
+  }
+}

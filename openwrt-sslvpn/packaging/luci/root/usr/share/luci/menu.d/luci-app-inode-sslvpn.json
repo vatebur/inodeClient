@@ -1,0 +1,42 @@
+{
+  "admin/services/inode-sslvpn": {
+    "title": "iNode SSL VPN",
+    "order": 90,
+    "action": {
+      "type": "firstchild",
+      "recurse": true
+    },
+    "depends": {
+      "acl": [
+        "luci-app-inode-sslvpn"
+      ],
+      "uci": {
+        "inode-sslvpn": true
+      }
+    }
+  },
+  "admin/services/inode-sslvpn/status": {
+    "title": "连接状态",
+    "order": 10,
+    "action": {
+      "type": "view",
+      "path": "inode-sslvpn/status"
+    }
+  },
+  "admin/services/inode-sslvpn/config": {
+    "title": "连接配置",
+    "order": 20,
+    "action": {
+      "type": "view",
+      "path": "inode-sslvpn/config"
+    }
+  },
+  "admin/services/inode-sslvpn/logs": {
+    "title": "日志与诊断",
+    "order": 30,
+    "action": {
+      "type": "view",
+      "path": "inode-sslvpn/logs"
+    }
+  }
+}

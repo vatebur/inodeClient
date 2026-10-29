@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Translate Rust's LLVM triple to Zig's musl triple for cross C/link steps."""
+import os, sys
+from pathlib import Path
+os.environ['ZIG_GLOBAL_CACHE_DIR'] = '/tmp/inode-zig-cache'
+root = Path(__file__).resolve().parents[1]
+zig = os.environ.get('INODE_ZIG', str(root.parent / 'openwrt-inode/toolchain/package/zig'))
+args = [arg.replace('x86_64-unknown-linux-musl', 'x86_64-linux-musl') if arg.startswith('--target=') else arg for arg in sys.argv[1:]]
+if '-nodefaultlibs' in args:
+    # Rust supplies its own musl CRT and libc. Invoke its LLD directly so the
+    # Zig C driver cannot inject a second set of startup objects.
+    candidates = list((root / 'toolchain/rustup/toolchains').glob('1.92.0-*/lib/rustlib/*/bin/rust-lld'))
+    if len(candidates) != 1:
+        raise SystemExit('Expected one Rust 1.92.0 host rust-lld')
+    lld = str(candidates[0])
+    link = []
+    for arg in args:
+        if arg in ('-m64', '-nodefaultlibs', '-nostartfiles', '-pthread'):
+            continue
+        if arg.startswith('-Wl,'):
+            link.extend(arg[4:].split(','))
+        elif arg == '-static-pie':
+            link.extend(['-static', '-pie', '--no-dynamic-linker'])
+        else:
+            link.append(arg)
+    os.execv(lld, [lld, '-flavor', 'gnu', *link])
+os.execv(zig, [zig, 'cc', '-target', 'x86_64-linux-musl', *args])

@@ -1,0 +1,136 @@
+#!/bin/sh
+# Own only values recorded in dhcp.inode_sslvpn_dns; preserve manual DNS rules.
+set -eu
+set -f
+umask 077
+
+# rc.common holds fd 1000 while running service hooks. Proxy daemons started
+# below must not inherit this lock and block subsequent VPN start/stop calls.
+case "$(readlink /proc/$$/fd/1000 2>/dev/null || :)" in
+	*/procd_inode-sslvpn.lock) eval 'exec 1000>&-' ;;
+esac
+
+fail() {
+	logger -t inode-sslvpn "VPN DNS: $*" || :
+	echo "VPN DNS: $*" >&2
+	exit 1
+}
+
+action=${1:-down}
+case "$action" in up|down) [ "$#" = 0 ] || shift ;; *) fail 'unsupported action' ;; esac
+owner=dhcp.inode_sslvpn_dns
+if [ "$action" = up ]; then
+	[ "$(uci -q get inode-sslvpn.main.gateway_dns || :)" = 1 ] || action=down
+fi
+
+mkdir -p /var/lock
+lock=/var/lock/inode-sslvpn-dns.lock
+attempt=0
+while ! mkdir "$lock" 2>/dev/null; do
+	attempt=$((attempt + 1))
+	[ "$attempt" -lt 15 ] || fail 'another DNS update is in progress'
+	sleep 1
+done
+work=''; staged=0; committed=0; success=0; passwall=0
+# Passwall's dnsmasq clone copies domain rules at startup and intercepts port 53.
+# Restart only a running clone; never enable a stopped proxy service.
+reload_dns() {
+	# SIGHUP does not reread dnsmasq configuration files.
+	/etc/init.d/dnsmasq restart || return 1
+	if [ -f "/var/etc/dnsmasq.conf.$section" ]; then
+		dnsmasq --test --conf-file="/var/etc/dnsmasq.conf.$section" || return 1
+	fi
+	[ "$passwall" = 0 ] || /etc/init.d/passwall restart
+}
+cleanup() {
+	result=$?
+	trap - EXIT HUP INT TERM
+	if [ "$staged" = 1 ]; then uci revert dhcp || :; fi
+	if [ "$committed" = 1 ] && [ "$success" = 0 ]; then
+		if cp -p "$work/dhcp" /etc/config/dhcp && reload_dns >"$work/rollback.log" 2>&1; then
+			logger -t inode-sslvpn 'VPN DNS: update failed; original settings restored' || :
+		else
+			logger -t inode-sslvpn 'VPN DNS: rollback failed; inspect DHCP/DNS settings' || :
+			result=1
+		fi
+	fi
+	[ -z "$work" ] || rm -rf "$work"
+	rmdir "$lock"
+	exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+# Read ownership inside the lock: service stop can race the client's exit hook.
+owned=$(uci -q get "$owner" || :)
+[ -z "$owned" ] || [ "$owned" = inode_sslvpn_dns ] || fail 'reserved DNS section already exists'
+[ "$action" != down ] || [ -n "$owned" ] || exit 0
+if [ -x /etc/init.d/passwall ] && pidof dnsmasq_default >/dev/null 2>&1; then passwall=1; fi
+[ -z "$(uci changes dhcp)" ] || fail 'save or revert pending DHCP/DNS changes first'
+command -v dnsmasq >/dev/null || fail 'dnsmasq is required'
+
+domains=''
+if [ "$action" = up ]; then
+	[ "$#" -gt 0 ] || fail 'gateway supplied no DNS covered by VPN routes'
+	for ip in "$@"; do
+		printf '%s\n' "$ip" | awk -F. '
+		 NF != 4 {exit 1}
+		 {for (i=1;i<=4;i++) if ($i !~ /^[0-9]+$/ || length($i)>3 || $i>255) exit 1}
+		 $1 == 0 || $1 == 127 || $1 >= 224 {exit 1}
+		' || fail 'invalid gateway DNS address'
+	done
+	domains=$(uci -q get inode-sslvpn.main.dns_domain || :)
+	[ -n "$domains" ] || fail 'configure at least one internal DNS domain'
+	domain_count=0
+	for domain in $domains; do
+		domain_count=$((domain_count + 1))
+		# Require DNS labels, without wildcards, slashes, ports or shell syntax.
+		[ "${#domain}" -le 253 ] && printf '%s\n' "$domain" | awk -F. '
+		 {for (i=1;i<=NF;i++) if (length($i)<1 || length($i)>63 || $i !~ /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/) exit 1}
+		' || fail 'invalid internal DNS domain'
+	done
+	[ "$domain_count" -gt 0 ] || fail 'configure at least one internal DNS domain'
+fi
+
+work=$(mktemp -d /tmp/inode-dns.XXXXXX)
+cp -p /etc/config/dhcp "$work/dhcp"
+uci export dhcp > "$work/before"
+staged=1
+if [ -n "$owned" ]; then
+	section=$(uci -q get "$owner.section")
+	case "$section" in ''|*[!a-zA-Z0-9_]*) fail 'invalid owned dnsmasq section' ;; esac
+	for option in server rebind_domain; do
+		for value in $(uci -q get "$owner.$option" || :); do
+			for existing in $(uci -q get "dhcp.$section.$option" || :); do
+				[ "$existing" != "$value" ] || uci del_list "dhcp.$section.$option=$value"
+			done
+		done
+	done
+	uci delete "$owner"
+fi
+
+add_owned() {
+	local option="$1" value="$2" existing
+	for existing in $(uci -q get "dhcp.$section.$option" || :); do
+		[ "$existing" != "$value" ] || return 0
+	done
+	uci add_list "dhcp.$section.$option=$value"
+	uci add_list "$owner.$option=$value"
+}
+if [ "$action" = up ]; then
+	section=$(uci -q show 'dhcp.@dnsmasq[0]' | sed -n '1s/^dhcp\.\([a-zA-Z0-9_]*\)=dnsmasq$/\1/p')
+	[ -n "$section" ] || fail 'primary dnsmasq section is missing'
+	uci set "$owner=inode_sslvpn_dns"
+	uci set "$owner.section=$section"
+	for domain in $domains; do
+		for ip in "$@"; do add_owned server "/$domain/$ip"; done
+		add_owned rebind_domain "$domain"
+	done
+fi
+uci export dhcp > "$work/after"
+if cmp -s "$work/before" "$work/after"; then exit 0; fi
+committed=1
+uci commit dhcp
+staged=0
+reload_dns >"$work/reload.log" 2>&1 || fail 'DNS reload failed; restoring original settings'
+success=1
+logger -t inode-sslvpn "VPN DNS: $action completed" || :

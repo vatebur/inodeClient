@@ -1,0 +1,87 @@
+#!/bin/sh
+# These two reserved sections belong to this package; leave every other section alone.
+set -eu
+umask 077
+
+fail() {
+	logger -t inode-sslvpn "LAN firewall: $*" || :
+	echo "LAN firewall: $*" >&2
+	exit 1
+}
+
+action=${1:-apply}
+case "$action" in apply|remove) ;; *) fail 'unsupported action' ;; esac
+if [ "$action" = apply ]; then
+	case "$(uci -q get inode-sslvpn.main.lan_access || :)" in
+		1|on|true|yes) ;; *) action=remove ;;
+	esac
+	case "$(uci -q get inode-sslvpn.main.enabled || :)" in
+		1|on|true|yes) ;; *) action=remove ;;
+	esac
+fi
+
+# A default-disabled installation must not touch the firewall at all.
+if [ "$action" = remove ] &&
+	! uci -q get firewall.inode_sslvpn_zone >/dev/null &&
+	! uci -q get firewall.inode_sslvpn_lan >/dev/null; then
+	exit 0
+fi
+
+mkdir -p /var/lock
+lock=/var/lock/inode-sslvpn-firewall.lock
+mkdir "$lock" 2>/dev/null || fail 'another update is in progress'
+work=''; staged=0; committed=0; success=0
+cleanup() {
+	result=$?
+	trap - EXIT HUP INT TERM
+	if [ "$staged" = 1 ]; then uci revert firewall || :; fi
+	if [ "$committed" = 1 ] && [ "$success" = 0 ]; then
+		if cp -p "$work/firewall" /etc/config/firewall && /etc/init.d/firewall reload >"$work/rollback.log" 2>&1; then
+			logger -t inode-sslvpn 'LAN firewall: update failed; original rules restored' || :
+		else
+			logger -t inode-sslvpn 'LAN firewall: rollback failed; check the firewall configuration' || :
+			result=1
+		fi
+	fi
+	[ -z "$work" ] || rm -rf "$work"
+	rmdir "$lock"
+	exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+[ -z "$(uci changes firewall)" ] || fail 'save or revert pending firewall changes first'
+command -v fw4 >/dev/null || fail 'firewall4 is required'
+if [ "$action" = apply ]; then
+	uci -q get network.lan >/dev/null || fail 'LAN network is missing'
+fi
+work=$(mktemp -d /tmp/inode-firewall.XXXXXX)
+cp -p /etc/config/firewall "$work/firewall"
+uci export firewall > "$work/before"
+staged=1
+uci -q delete firewall.inode_sslvpn_lan || :
+uci -q delete firewall.inode_sslvpn_zone || :
+if [ "$action" = apply ]; then
+	uci set firewall.inode_sslvpn_zone=zone
+	uci set firewall.inode_sslvpn_zone.name=inode_vpn
+	uci set firewall.inode_sslvpn_zone.family=ipv4
+	uci add_list firewall.inode_sslvpn_zone.device=inode+
+	uci set firewall.inode_sslvpn_zone.input=REJECT
+	uci set firewall.inode_sslvpn_zone.output=ACCEPT
+	uci set firewall.inode_sslvpn_zone.forward=REJECT
+	uci set firewall.inode_sslvpn_zone.masq=1
+	# fw4 resolves the current LAN addresses and masks; never bake in a site subnet.
+	uci add_list firewall.inode_sslvpn_zone.masq_src=lan
+	uci set firewall.inode_sslvpn_zone.mtu_fix=1
+	uci set firewall.inode_sslvpn_lan=forwarding
+	uci set firewall.inode_sslvpn_lan.src=lan
+	uci set firewall.inode_sslvpn_lan.dest=inode_vpn
+fi
+uci export firewall > "$work/after"
+if cmp -s "$work/before" "$work/after"; then exit 0; fi
+fw4 check > "$work/check.log" 2>&1 || fail 'validation failed; original rules retained'
+committed=1
+uci commit firewall
+staged=0
+/etc/init.d/firewall reload > "$work/reload.log" 2>&1 || fail 'reload failed; restoring original rules'
+success=1
+logger -t inode-sslvpn "LAN firewall: $action completed" || :
