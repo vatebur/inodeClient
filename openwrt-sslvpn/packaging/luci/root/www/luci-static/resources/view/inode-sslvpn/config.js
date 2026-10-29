@@ -49,7 +49,8 @@ return view.extend({
   o.description = '客户端拒绝默认路由及覆盖 VPN 网关的路由。';
   o = s.taboption('routes', form.Flag, 'lan_access', '允许局域网通过 VPN 访问'); o.default = '0'; o.rmempty = false;
   o.description = '为 LAN 启用到 VPN 的转发和地址转换。电脑需将网关或内网静态路由指向本设备；关闭或断开连接时移除本插件规则。默认关闭，不修改 DNS。';
-  o = s.taboption('routes', form.DynamicList, 'route', '额外 IPv4 路由'); o.datatype = 'cidr4';
+  o = s.taboption('routes', form.DynamicList, 'route', '额外 IPv4 路由');
+  // cidr4 changes LuCI's validation value to the prefix; validate the full CIDR here.
   o.validate = function(section, value) {
    if (!value) return true;
    var match = /^(\d+)\.(\d+)\.(\d+)\.(\d+)\/(\d+)$/.exec(value);

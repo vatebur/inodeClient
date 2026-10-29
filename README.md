@@ -12,4 +12,4 @@
 - [Release](https://github.com/vatebur/inodeClient/releases)：iStoreOS 25.12 x86_64 / APK 安装包。
 
 发布构建由根目录 `.github/workflows/build-release.yml` 手动触发，执行静态编译及打包，
-生成静态客户端、三个 APK 和离线安装包。客户端版本为 0.4.2，APK 版本为 0.4.2-r1。
+生成静态客户端、三个 APK 和离线安装包。客户端版本为 0.4.2，APK 版本为 0.4.2-r2。
