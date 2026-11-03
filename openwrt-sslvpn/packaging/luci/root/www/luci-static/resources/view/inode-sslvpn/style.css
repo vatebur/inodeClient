@@ -2,6 +2,8 @@
 .inode-page { --inode-border: var(--border-color-medium, rgba(128,128,128,.28)); }
 .inode-page .inode-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem; }
 .inode-page .inode-header h2 { margin:.35rem 0 .5rem; }
+.inode-page .inode-brand { display:flex; align-items:center; gap:.6rem; }
+.inode-page .inode-logo { display:block; width:40px; height:40px; flex:0 0 40px; }
 .inode-page .inode-eyebrow { font-size:.8rem; font-weight:600; letter-spacing:.08em; opacity:.65; }
 .inode-page .inode-hint { font-size:.9em; line-height:1.7; opacity:.75; }
 .inode-page .inode-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin:1rem 0 1.5rem; }

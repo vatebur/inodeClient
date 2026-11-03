@@ -77,7 +77,10 @@ return view.extend({
   return E('div', { class: 'inode-page' }, [
    E('link', { rel: 'stylesheet', href: L.resource('view/inode-sslvpn/style.css') }),
    E('div', { class: 'inode-header' }, [E('div', {}, [
-    E('span', { class: 'inode-eyebrow' }, 'iNode SSL VPN'), E('h2', {}, '连接状态'),
+    E('div', { class: 'inode-brand' }, [
+     E('img', { class: 'inode-logo', src: L.resource('view/inode-sslvpn/logo.svg'), alt: '', width: 40, height: 40 }),
+     E('span', { class: 'inode-eyebrow' }, 'iNode SSL VPN')
+    ]), E('h2', {}, '连接状态'),
     E('p', { class: 'inode-hint' }, '查看服务与隧道的实时状态，管理当前连接。')
    ]), updated]), errorNode,
    E('div', { class: 'inode-grid' }, [

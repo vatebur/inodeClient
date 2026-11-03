@@ -42,7 +42,10 @@ return view.extend({
   return E('div', { class: 'inode-page' }, [
    E('link', { rel: 'stylesheet', href: L.resource('view/inode-sslvpn/style.css') }),
    E('div', { class: 'inode-header' }, [E('div', {}, [
-    E('span', { class: 'inode-eyebrow' }, 'iNode SSL VPN'), E('h2', {}, '日志与诊断'),
+    E('div', { class: 'inode-brand' }, [
+     E('img', { class: 'inode-logo', src: L.resource('view/inode-sslvpn/logo.svg'), alt: '', width: 40, height: 40 }),
+     E('span', { class: 'inode-eyebrow' }, 'iNode SSL VPN')
+    ]), E('h2', {}, '日志与诊断'),
     E('p', { class: 'inode-hint' }, '快速定位认证、证书与隧道连接问题。')
    ]), E('div', { class: 'inode-actions' }, [E('label', {}, [auto, ' 自动刷新（5 秒）']), button])]),
    E('div', { class: 'inode-grid inode-diagnostics' }, [

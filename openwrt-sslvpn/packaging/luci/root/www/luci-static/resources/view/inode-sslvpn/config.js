@@ -80,7 +80,10 @@ return view.extend({
    return E('div', { class: 'inode-page' }, [
     E('link', { rel: 'stylesheet', href: L.resource('view/inode-sslvpn/style.css') }),
     E('div', { class: 'inode-intro' }, [
-     E('span', { class: 'inode-eyebrow' }, 'iNode SSL VPN'),
+     E('div', { class: 'inode-brand' }, [
+      E('img', { class: 'inode-logo', src: L.resource('view/inode-sslvpn/logo.svg'), alt: '', width: 40, height: 40 }),
+      E('span', { class: 'inode-eyebrow' }, 'iNode SSL VPN')
+     ]),
      E('p', {}, '只将指定内网流量送入 VPN，保留系统默认路由；可按域名启用内网 DNS。')
     ]),
     formNode

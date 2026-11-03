@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="openwrt-sslvpn/packaging/luci/root/www/luci-static/resources/view/inode-sslvpn/logo.svg" width="128" height="128" alt="iNode SSL VPN Logo">
+</p>
+
 # H3C iNode SSL VPN for OpenWrt
 
 基于 [inode-cli](https://github.com/VocabVictor/inode-cli) 的 H3C SSL VPN 协议兼容客户端，集成 OpenWrt UCI 配置与 procd 服务，提供 x86_64 musl 静态构建。官方 iNode 闭源安装包不纳入本仓库。
