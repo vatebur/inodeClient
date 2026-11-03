@@ -1,17 +1,17 @@
 # iStore / iStoreOS 安装包
 
 目标平台：iStoreOS 25.12.5，x86/64，x86_64，apk-tools 3。
-当前源码包版本为 0.4.2-r2，仅适用于 APK 系统的 x86_64，不适用于 opkg/IPK、ARM 或 MIPS。
+当前源码包版本为 0.4.2-r3，仅适用于 APK 系统的 x86_64，不适用于 opkg/IPK、ARM 或 MIPS。
 
 ## 产物与安装
 
-按下文构建后生成 `../dist/inode-sslvpn-0.4.2-r2-istoreos-25.12-x86_64.run`，可上传到 iStore「手动安装」。
+按下文构建后生成 `../dist/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run`，可上传到 iStore「手动安装」。
 包含主程序包、LuCI 页面包、app-meta 元数据包。LuCI 位于「服务 → iNode SSL VPN」。
 
 也可将 .run 复制到设备后运行：
 
 ```sh
-sh /tmp/inode-sslvpn-0.4.2-r2-istoreos-25.12-x86_64.run
+sh /tmp/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run
 ```
 
 安装器保存并恢复已有 UCI 配置，兼容原先通过 tar.gz 安装的未被包管理器接管的配置。
@@ -31,7 +31,7 @@ LuCI 页面提供动态状态、配置、密码更新、连接/断开/重连、�
 
 ## 重建 APK v3
 
-0.4.2-r2 必须重新编译客户端，不能复用旧版二进制；新版客户端负责连接、断线和重连时的 DNS 管理。
+客户端从 0.4.2-r2 起负责连接、断线和重连时的 DNS 管理；本次 0.4.2-r3 沿用该客户端版本，并重新构建完整安装包。
 
 ```sh
 sh cargo-openwrt.sh build --offline --locked --release --target x86_64-unknown-linux-musl --features openwrt
@@ -61,7 +61,7 @@ APK=/path/to/build-host/apk sh build-apk.sh
 
 ```sh
 sh packaging/build-offline.sh /path/to/makeself.sh /path/to/stage/output \
-  "$PWD/dist/inode-sslvpn-0.4.2-r2-istoreos-25.12-x86_64.run"
+  "$PWD/dist/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run"
 ```
 
 升级版本时需要同步三个 Makefile、meta JSON、两个 shell 脚本中的版本号。

@@ -28,9 +28,9 @@ if [ -f /etc/inode-sslvpn/password ] && [ ! -L /etc/inode-sslvpn/password ]; the
 fi
 # Local build is unsigned; allow only this explicit set of offline artifacts.
 apk --no-network --allow-untrusted add \
- ./inode-sslvpn-0.4.2-r2.apk \
- ./luci-app-inode-sslvpn-0.4.2-r2.apk \
- ./app-meta-inode-sslvpn-0.4.2-r2.apk
+ ./inode-sslvpn-0.4.2-r3.apk \
+ ./luci-app-inode-sslvpn-0.4.2-r3.apk \
+ ./app-meta-inode-sslvpn-0.4.2-r3.apk
 restore
 trap - EXIT
 echo 'Installed. Open Services -> iNode SSL VPN. Existing configuration/password preserved.'

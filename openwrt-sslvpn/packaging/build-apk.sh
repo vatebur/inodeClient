@@ -42,10 +42,10 @@ for name in inode-sslvpn luci-app-inode-sslvpn app-meta-inode-sslvpn; do
  app-meta-inode-sslvpn) deps='luci-app-inode-sslvpn' ;;
  esac
  if [ -n "${APK_SIGN_KEY:-}" ]; then set -- "$@" --sign-key "$APK_SIGN_KEY"; fi
- "$APK" mkpkg --info "name:$name" --info 'version:0.4.2-r2' \
+ "$APK" mkpkg --info "name:$name" --info 'version:0.4.2-r3' \
   --info "arch:$arch" --info 'license:MIT' \
   --info "description:H3C SSL VPN compatible client - $name" \
   --info 'url:https://github.com/VocabVictor/inode-cli' \
   --info 'origin:inode-sslvpn' --info "depends:$deps" \
-  "$@" --files "$name" --output "output/${name}-0.4.2-r2.apk"
+  "$@" --files "$name" --output "output/${name}-0.4.2-r3.apk"
 done

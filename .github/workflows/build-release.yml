@@ -52,9 +52,9 @@ jobs:
           cd "$GITHUB_WORKSPACE/openwrt-sslvpn"
           cp "$RUNNER_TEMP/inode-stage/output/"*.apk dist/release/
           sudo sh packaging/build-offline.sh /usr/bin/makeself "$RUNNER_TEMP/inode-stage/output" \
-            dist/release/inode-sslvpn-0.4.2-r2-istoreos-25.12-x86_64.run
-          sh dist/release/inode-sslvpn-0.4.2-r2-istoreos-25.12-x86_64.run --check
-          sh dist/release/inode-sslvpn-0.4.2-r2-istoreos-25.12-x86_64.run --noexec --target "$RUNNER_TEMP/unpacked"
+            dist/release/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run
+          sh dist/release/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run --check
+          sh dist/release/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run --noexec --target "$RUNNER_TEMP/unpacked"
           cmp packaging/install-offline.sh "$RUNNER_TEMP/unpacked/install.sh"
           for package in "$RUNNER_TEMP/inode-stage/output/"*.apk; do
             cmp "$package" "$RUNNER_TEMP/unpacked/$(basename "$package")"
@@ -63,7 +63,7 @@ jobs:
           sha256sum inode-sslvpn-linux-x86_64-musl *.apk *.run > SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: inode-sslvpn-0.4.2-r2-x86_64
+          name: inode-sslvpn-0.4.2-r3-x86_64
           path: openwrt-sslvpn/dist/release/
           if-no-files-found: error
           retention-days: 14

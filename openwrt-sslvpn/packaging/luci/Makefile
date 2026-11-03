@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 PKG_NAME:=luci-app-inode-sslvpn
 PKG_VERSION:=0.4.2
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKG_LICENSE:=MIT
 include $(INCLUDE_DIR)/package.mk
 
