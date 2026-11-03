@@ -7,6 +7,7 @@
 
 按下文构建后生成 `../dist/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run`，可上传到 iStore「手动安装」。
 包含主程序包、LuCI 页面包、app-meta 元数据包。LuCI 位于「服务 → iNode SSL VPN」。
+iStoreOS 应用列表图标随 LuCI 包安装到 `/www/luci-static/resources/app-icons/inode-sslvpn.png`。
 
 也可将 .run 复制到设备后运行：
 
@@ -15,6 +16,7 @@ sh /tmp/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run
 ```
 
 安装器保存并恢复已有 UCI 配置，兼容原先通过 tar.gz 安装的未被包管理器接管的配置。
+离线安装器支持同版本修正版重装。
 密码不打包；离线安装器在权限为 0700 的临时目录备份已有密码和配置，成功或失败退出均恢复并删除备份。配置文件权限 0600，密码目录权限 0700。
 新安装不自动连接、不启用开机启动。升级会停止原服务，安装后应检查配置并手动重启。
 LuCI 页面提供动态状态、配置、密码更新、连接/断开/重连、独立开机启动和脱敏诊断。
