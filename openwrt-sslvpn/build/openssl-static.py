@@ -96,12 +96,26 @@ def prepare(args):
                 os.replace(archive, cached_archive)
             source = work / f"openssl-{VERSION}"
             staging = work / "install"
+            extra_flags = []
+            if args.toolchain == "musl-gcc":
+                # Debian's musl include path omits the Linux UAPI headers needed
+                # by OpenSSL's secure heap. Expose only UAPI, never glibc headers.
+                uapi = work / "linux-uapi"
+                uapi.mkdir()
+                for name in ("linux", "asm-generic", "asm"):
+                    candidates = (Path("/usr/include") / name,
+                                  Path("/usr/include/x86_64-linux-gnu") / name)
+                    header = next((path for path in candidates if path.is_dir()), None)
+                    if header is None:
+                        raise SystemExit(f"Missing Linux UAPI headers: {name}; install linux-libc-dev")
+                    (uapi / name).symlink_to(header, target_is_directory=True)
+                extra_flags.append("-I../linux-uapi")
             run(
                 ["perl", "Configure", "linux-x86_64", "--prefix=/usr",
                  "--openssldir=/etc/ssl", "--libdir=lib", "no-shared", "no-module",
                  "no-engine", "no-async", "no-comp", "no-zlib", "no-zlib-dynamic", "no-tests",
                  "no-ssl3", "no-md2", "no-rc5", "no-weak-ssl-ciphers",
-                 "no-camellia", "no-idea", "no-seed"],
+                 "no-camellia", "no-idea", "no-seed", *extra_flags],
                 cwd=source, env=env,
             )
             jobs = min(8, os.cpu_count() or 1)
