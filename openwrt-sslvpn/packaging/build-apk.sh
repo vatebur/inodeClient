@@ -38,14 +38,14 @@ for name in inode-sslvpn luci-app-inode-sslvpn app-meta-inode-sslvpn; do
  inode-sslvpn)
   arch=x86_64; deps='kmod-tun ip-full firewall4'
   set -- --script "post-install:scripts/post-install" --script "post-upgrade:scripts/post-install" --script "pre-deinstall:scripts/pre-deinstall" --script "pre-upgrade:scripts/pre-upgrade" ;;
- luci-app-inode-sslvpn) deps='inode-sslvpn luci-base rpcd jshn logd'; set -- --script 'post-install:scripts/luci-refresh' --script 'post-upgrade:scripts/luci-refresh' ;;
+ luci-app-inode-sslvpn) deps='inode-sslvpn luci-base rpcd jshn logd ucode ucode-mod-fs'; set -- --script 'post-install:scripts/luci-refresh' --script 'post-upgrade:scripts/luci-refresh' ;;
  app-meta-inode-sslvpn) deps='luci-app-inode-sslvpn' ;;
  esac
  if [ -n "${APK_SIGN_KEY:-}" ]; then set -- "$@" --sign-key "$APK_SIGN_KEY"; fi
- "$APK" mkpkg --info "name:$name" --info 'version:0.4.2-r3' \
+ "$APK" mkpkg --info "name:$name" --info 'version:0.4.2-r4' \
   --info "arch:$arch" --info 'license:MIT' \
   --info "description:H3C SSL VPN compatible client - $name" \
   --info 'url:https://github.com/VocabVictor/inode-cli' \
   --info 'origin:inode-sslvpn' --info "depends:$deps" \
-  "$@" --files "$name" --output "output/${name}-0.4.2-r3.apk"
+  "$@" --files "$name" --output "output/${name}-0.4.2-r4.apk"
 done

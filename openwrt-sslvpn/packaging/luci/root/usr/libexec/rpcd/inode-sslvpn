@@ -58,18 +58,35 @@ call)
   json_init; json_add_string events "$events"; json_dump
   ;;
  password)
-  read -r request
-  json_load "$request" || { reply_error '请求格式错误'; exit; }
-  json_get_var password password
+  # Read the rpcd pipe directly. jshn's json_load passes the request in argv.
+  unset password
+  password=$(ucode -e '
+   import { stdin } from "fs";
+   let request = json(stdin);
+   if (type(request) != "object") exit(1);
+   if (!exists(request, "password")) exit(0);
+   let password = request.password;
+   if (type(password) != "string") exit(1);
+   if (length(password) > 4096) exit(2);
+   if (index(password, chr(0)) >= 0 || index(password, "\r") >= 0 || index(password, "\n") >= 0) exit(3);
+   print(password);
+  ' 2>/dev/null) || {
+   case "$?" in
+    2) reply_error '密码过长' ;;
+    3) reply_error '密码不能包含换行或 NUL' ;;
+    *) reply_error '请求格式错误' ;;
+   esac
+   exit
+  }
   if [ -n "$password" ]; then
-   [ "${#password}" -le 4096 ] || { reply_error '密码过长'; exit; }
-   case "$password" in *'
-'*|*'
-'*) reply_error '密码不能包含换行'; exit ;; esac
    [ ! -L /etc/inode-sslvpn ] && [ ! -L /etc/inode-sslvpn/password ] || { reply_error '密码路径不能为符号链接'; exit; }
+   if [ -e /etc/inode-sslvpn/password ] && [ ! -f /etc/inode-sslvpn/password ]; then
+    reply_error '密码路径必须为普通文件'; exit
+   fi
    umask 077
    mkdir -p /etc/inode-sslvpn && chmod 700 /etc/inode-sslvpn || { reply_error '无法创建密码目录'; exit; }
    tmp=$(mktemp /etc/inode-sslvpn/.password.XXXXXX) || { reply_error '无法创建密码文件'; exit; }
+   # OpenWrt's ash provides printf as a builtin, keeping the value off argv.
    if printf '%s\n' "$password" > "$tmp" && chown 0:0 "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" /etc/inode-sslvpn/password; then :; else
     rm -f "$tmp"; reply_error '密码保存失败'; exit
    fi

@@ -20,23 +20,64 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y musl-tools build-essential perl pkg-config makeself
+          sudo apt-get install -y musl-tools build-essential perl pkg-config makeself cmake libjson-c-dev
           rustup toolchain install 1.92.0 --profile minimal --target x86_64-unknown-linux-musl
+      - name: Build OpenWrt-compatible ucode for regression tests
+        run: |
+          ucode_source="$RUNNER_TEMP/inode-ucode-source"
+          ucode_build="$RUNNER_TEMP/inode-ucode-build"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://codeload.github.com/jow-/ucode/tar.gz/85922056ef7abeace3cca3ab28bc1ac2d88e31b1 \
+            --output "$RUNNER_TEMP/inode-ucode.tar.gz"
+          echo '54dda1e8a2757710c285659e42336f5054f1825f20d01a4016245bbf877f6da7  '"$RUNNER_TEMP/inode-ucode.tar.gz" | sha256sum --check
+          mkdir -p "$ucode_source"
+          tar -xzf "$RUNNER_TEMP/inode-ucode.tar.gz" -C "$ucode_source" --strip-components=1
+          cmake -S "$ucode_source" -B "$ucode_build" -DLIB_SEARCH_PATH="$ucode_build/*.so"
+          cmake --build "$ucode_build" --parallel 2 --target ucode fs_lib
+      - name: Test password handling and offline upgrade recovery
+        run: |
+          INODE_TEST_UCODE="$RUNNER_TEMP/inode-ucode-build/ucode" \
+            python3 -m unittest discover -s openwrt-sslvpn/tests -v
       - name: Build static client without personal paths
         working-directory: openwrt-sslvpn/client
         run: |
           export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=/src --remap-path-prefix=$HOME=/build"
-          cargo +1.92.0 build --locked --release --target x86_64-unknown-linux-musl --features openwrt
-          file target/x86_64-unknown-linux-musl/release/inode
+          python3 ../build/openssl-static.py --toolchain musl-gcc --cache-dir "$RUNNER_TEMP/inode-openssl" \
+            -- cargo +1.92.0 build --locked --release --target x86_64-unknown-linux-musl --features openwrt
+          binary=target/x86_64-unknown-linux-musl/release/inode
+          file "$binary"
+          program_headers=$(readelf -lW "$binary")
+          dynamic_entries=$(readelf -dW "$binary")
+          if grep -qw INTERP <<<"$program_headers" || grep -q '(NEEDED)' <<<"$dynamic_entries"; then
+            echo 'Expected a statically linked client' >&2
+            exit 1
+          fi
+          strings "$binary" | grep -E '^OpenSSL 3\.5\.9 [0-9]'
+          "$binary" --version
       - name: Test decoder limits
         working-directory: openwrt-sslvpn/client
-        run: cargo +1.92.0 test --locked --lib
+        run: |
+          export RUSTFLAGS="--remap-path-prefix=$GITHUB_WORKSPACE=/src --remap-path-prefix=$HOME=/build"
+          python3 ../build/openssl-static.py --toolchain musl-gcc --cache-dir "$RUNNER_TEMP/inode-openssl" --offline \
+            -- cargo +1.92.0 test --locked --release --target x86_64-unknown-linux-musl --features openwrt --lib
+      - name: Test OpenSSL relative CRL distribution point handling
+        run: |
+          openssl_prefix=$(python3 openwrt-sslvpn/build/openssl-static.py --toolchain musl-gcc \
+            --cache-dir "$RUNNER_TEMP/inode-openssl" --offline)
+          openssl_source=$(mktemp -d "$RUNNER_TEMP/inode-openssl-test.XXXXXX")
+          tar -xzf "$RUNNER_TEMP/inode-openssl/openssl-3.5.9.tar.gz" \
+            -C "$openssl_source" --strip-components=1
+          musl-gcc -O2 -Wall -Werror -static -I"$openssl_prefix/include" -I"$openssl_source/include" \
+            openwrt-sslvpn/tests/openssl_crldp_regression.c \
+            "$openssl_prefix/lib/libssl.a" "$openssl_prefix/lib/libcrypto.a" \
+            -pthread -ldl -o "$RUNNER_TEMP/inode-openssl-crldp-regression"
+          "$RUNNER_TEMP/inode-openssl-crldp-regression"
       - name: Prepare APK tool
         run: |
           mkdir -p build-tools
           curl --fail --location --retry 3 --output build-tools/apk-tools-static.apk \
-            https://dl-cdn.alpinelinux.org/alpine/edge/main/x86_64/apk-tools-static-3.0.8-r0.apk
-          echo '673f1bfb22136fc42ca035321cf731a4ad0452c000928666cb39a138f0c277bf  build-tools/apk-tools-static.apk' | sha256sum --check
+            https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/apk-tools-static-3.0.9-r0.apk
+          echo '0a1a0682375f66a83b7b903f6e4638ccfe312547d50d336b5f2be9fc391281be  build-tools/apk-tools-static.apk' | sha256sum --check
           tar -xzf build-tools/apk-tools-static.apk -C build-tools sbin/apk.static
       - name: Package and verify
         working-directory: openwrt-sslvpn
@@ -52,9 +93,9 @@ jobs:
           cd "$GITHUB_WORKSPACE/openwrt-sslvpn"
           cp "$RUNNER_TEMP/inode-stage/output/"*.apk dist/release/
           sudo sh packaging/build-offline.sh /usr/bin/makeself "$RUNNER_TEMP/inode-stage/output" \
-            dist/release/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run
-          sh dist/release/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run --check
-          sh dist/release/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run --noexec --target "$RUNNER_TEMP/unpacked"
+            dist/release/inode-sslvpn-0.4.2-r4-istoreos-25.12-x86_64.run
+          sh dist/release/inode-sslvpn-0.4.2-r4-istoreos-25.12-x86_64.run --check
+          sh dist/release/inode-sslvpn-0.4.2-r4-istoreos-25.12-x86_64.run --noexec --target "$RUNNER_TEMP/unpacked"
           cmp packaging/install-offline.sh "$RUNNER_TEMP/unpacked/install.sh"
           for package in "$RUNNER_TEMP/inode-stage/output/"*.apk; do
             cmp "$package" "$RUNNER_TEMP/unpacked/$(basename "$package")"
@@ -63,7 +104,7 @@ jobs:
           sha256sum inode-sslvpn-linux-x86_64-musl *.apk *.run > SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: inode-sslvpn-0.4.2-r3-x86_64
+          name: inode-sslvpn-0.4.2-r4-x86_64
           path: openwrt-sslvpn/dist/release/
           if-no-files-found: error
           retention-days: 14

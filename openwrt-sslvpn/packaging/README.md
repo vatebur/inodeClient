@@ -1,23 +1,29 @@
 # iStore / iStoreOS 安装包
 
 目标平台：iStoreOS 25.12.5，x86/64，x86_64，apk-tools 3。
-当前源码包版本为 0.4.2-r3，仅适用于 APK 系统的 x86_64，不适用于 opkg/IPK、ARM 或 MIPS。
+当前安装包版本为 0.4.2-r4，适用于使用 APK 的 x86_64 iStoreOS。Rust 客户端版本为 0.4.2。
+
+## 0.4.2-r4 安全修复
+
+- LuCI 密码 RPC 从标准输入解析请求，避免明文密码进入进程参数。该解析依赖 `ucode` 和 `ucode-mod-fs`。
+- 离线安装器完成配置与密码备份后才开始安装。恢复通过原子替换写入，恢复失败时保留完整备份。
+- 静态客户端使用经过 SHA-256 校验的 OpenSSL 3.5.9 LTS，并增加针对 CVE-2026-35189 的相对 CRL 分发点回归测试。
 
 ## 产物与安装
 
-按下文构建后生成 `../dist/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run`，可上传到 iStore「手动安装」。
+按下文构建后生成 `../dist/inode-sslvpn-0.4.2-r4-istoreos-25.12-x86_64.run`，可上传到 iStore「手动安装」。
 包含主程序包、LuCI 页面包、app-meta 元数据包。LuCI 位于「服务 → iNode SSL VPN」。
 iStoreOS 应用列表图标随 LuCI 包安装到 `/www/luci-static/resources/app-icons/inode-sslvpn.png`。
 
 也可将 .run 复制到设备后运行：
 
 ```sh
-sh /tmp/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run
+sh /tmp/inode-sslvpn-0.4.2-r4-istoreos-25.12-x86_64.run
 ```
 
 安装器保存并恢复已有 UCI 配置，兼容原先通过 tar.gz 安装的未被包管理器接管的配置。
 离线安装器支持同版本修正版重装。
-密码不打包；离线安装器在权限为 0700 的临时目录备份已有密码和配置，成功或失败退出均恢复并删除备份。配置文件权限 0600，密码目录权限 0700。
+密码单独保存在设备上。离线安装器在权限为 0700 的临时目录完成备份后才开始安装。安装退出时原子恢复已有密码和配置，恢复成功后删除备份。恢复失败时保留完整备份并打印其位置。配置文件权限 0600，密码目录权限 0700。
 新安装不自动连接、不启用开机启动。升级会停止原服务，安装后应检查配置并手动重启。
 LuCI 页面提供动态状态、配置、密码更新、连接/断开/重连、独立开机启动和脱敏诊断。
 路由设置新增默认关闭的「允许局域网通过 VPN 访问」，配置 LAN → VPN 转发、NAT 和 MTU 调整。
@@ -27,16 +33,17 @@ LuCI 页面提供动态状态、配置、密码更新、连接/断开/重连、�
 密码通过专用 RPC 原子写入 `/etc/inode-sslvpn/password`，root 所有、0600；留空保留，页面不读取已有值。
 
 此次 APK 为本地构建的未签名包；离线安装器对随包携带的三个明确文件使用 `--allow-untrusted`。
-不会修改系统全局签名信任配置。依赖 `firewall4`、`ip-full`、`kmod-tun`、`luci-base`、`rpcd`、`jshn`、`logd` 必须已安装。
+离线安装需要预先安装 `firewall4`、`ip-full`、`kmod-tun`、`luci-base`、`rpcd`、`jshn`、`logd`、`ucode` 和 `ucode-mod-fs`。系统继续使用原有的全局签名信任配置。
 若要放入正式在线仓库，应通过仓库的审核、构建与签名流程，不代表本包已获官方上架。
 不要仅改扩展名生成 IPK/APK。
 
 ## 重建 APK v3
 
-客户端从 0.4.2-r2 起负责连接、断线和重连时的 DNS 管理；本次 0.4.2-r3 沿用该客户端版本，并重新构建完整安装包。
+客户端从 0.4.2-r2 起负责连接、断线和重连时的 DNS 管理。0.4.2-r4 重新编译静态客户端并构建完整安装包。
 
 ```sh
-sh cargo-openwrt.sh build --offline --locked --release --target x86_64-unknown-linux-musl --features openwrt
+sh cargo-openwrt.sh build --locked --release --target x86_64-unknown-linux-musl --features openwrt
+mkdir -p dist
 cp client/target/x86_64-unknown-linux-musl/release/inode dist/inode-sslvpn
 ```
 从 `openwrt-sslvpn/` 执行，输出目录必须不存在：
@@ -54,7 +61,7 @@ APK=/path/to/build-host/apk sh build-apk.sh
 ```
 
 路由器自带 apk 未编入 mkpkg，不能直接用它构建。本次使用独立的 Alpine apk-tools-static
-3.0.8-r0，只在路由器 /tmp 执行，不替换系统 3.0.5。生成的 APK v3 已由系统 apk 验证和安装。
+3.0.9-r0，取自 Alpine 3.24 稳定仓库并校验固定 SHA-256。此前版本生成的 APK v3 已由目标系统验证和安装。
 构建脚本按官方 package-pack.mk 的方式声明依赖、安装脚本与 `/lib/apk/packages/` 清单。
 文件所有者标准化为 root:root；配置声明支持 APK 升级保护和 OpenWrt sysupgrade 保留。
 可设 `APK_SIGN_KEY` 指向自己的 APK 签名私钥；信任和发布公钥应由发行方另行管理。
@@ -63,10 +70,10 @@ APK=/path/to/build-host/apk sh build-apk.sh
 
 ```sh
 sh packaging/build-offline.sh /path/to/makeself.sh /path/to/stage/output \
-  "$PWD/dist/inode-sslvpn-0.4.2-r3-istoreos-25.12-x86_64.run"
+  "$PWD/dist/inode-sslvpn-0.4.2-r4-istoreos-25.12-x86_64.run"
 ```
 
-升级版本时需要同步三个 Makefile、meta JSON、两个 shell 脚本中的版本号。
+升级安装包修订号时同步三个 Makefile、meta JSON、三个打包和安装脚本以及发布工作流。
 
 ## SDK 和官方商店
 

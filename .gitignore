@@ -19,6 +19,7 @@ __pycache__/
 !/openwrt-sslvpn/build/zig-cc
 !/openwrt-sslvpn/build/zig-ar
 !/openwrt-sslvpn/build/zig-ranlib
+!/openwrt-sslvpn/build/openssl-static.py
 *.log
 
 # Actual connection configuration and gateway-assigned network information.

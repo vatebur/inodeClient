@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 PKG_NAME:=inode-sslvpn
 PKG_VERSION:=0.4.2
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 PKG_LICENSE:=MIT
 include $(INCLUDE_DIR)/package.mk
 

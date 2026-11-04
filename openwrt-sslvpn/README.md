@@ -7,10 +7,10 @@
 - `client/`：Rust 运行源码与 Cargo.lock，保留上游许可。
 - `files/`：UCI 模板、前台启动包装脚本和 procd 服务。
 - `install.sh`：首次安装；拒绝覆盖已有文件，默认禁用，不覆盖已有密码。
-- `cargo-openwrt.sh`、`build/zig-*`：交叉构建入口和工具适配器。
+- `cargo-openwrt.sh`、`build/`：交叉构建入口、Zig 工具适配器及静态 OpenSSL 构建。
 - `local/`：本地实际配置，忽略且不提交。
 
-当前版本为 `0.4.2-r1`，客户端版本为 `0.4.2`。连接参数可通过 LuCI 配置，命令行选项见 `inode-sslvpn connect --help`。
+当前安装包版本为 `0.4.2-r4`，客户端版本为 `0.4.2`。连接参数可通过 LuCI 配置，命令行选项见 `inode-sslvpn connect --help`。
 
 ## 构建与验证
 
@@ -23,7 +23,9 @@
 
 输出为 `client/target/x86_64-unknown-linux-musl/release/inode`。Zig 负责目标平台 C 编译、ar 和 ranlib；Rust 自带 LLD 负责最终链接，避免重复 CRT 和 macOS ranlib 破坏 ELF 归档。产物为 Linux x86_64 musl 静态 PIE。
 
-测试代码和现场验证记录只在本地保留，不随源码仓库或安装包发布。
+交叉构建首次从 OpenSSL 官方站点获取 3.5.9 LTS 源码，核对固定的 SHA-256 后编译静态库。已验证的归档和构建产物缓存在 `build/openssl/`。也可通过 `INODE_OPENSSL_ARCHIVE=/absolute/path/to/openssl-3.5.9.tar.gz` 使用同一官方归档。准备好依赖缓存后，可加 `--offline` 离线重建。
+
+发布流程执行协议解码限制、RPC 密码处理、离线升级恢复和 OpenSSL 相对 CRL 分发点处理的自动测试，并检查产物静态链接及嵌入的 OpenSSL 版本。现场验证记录留在本地。
 
 ## 安装与运行
 
